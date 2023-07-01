@@ -90,6 +90,7 @@ class PrepareHeader:
             'Cache-Control' : 'max-age=3600 ,no-cache ,private',
             'Pragma' : 'no-cache',
             'Content-Length': len(Content),
+            'Set-Cookie': 'SessionID= Null; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/'
         }
         if Cookie:
             headers.update(self.convert_cookie_dict_to_header(Cookie))
