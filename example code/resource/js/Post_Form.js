@@ -1,83 +1,86 @@
-    // 댓글 작성 폼 제출 시 처리
-    document.getElementById("comment-form").addEventListener("submit", function(event) {
-        event.preventDefault();
-  
-        var username = document.getElementById("comment-username").value;
-        var content = document.getElementById("comment-content").value;
-        // var image = document.getElementById("comment-image").files[0];
-  
-        // FormData 객체를 사용하여 댓글 데이터를 구성
-        var formData = {
-        "Form": "Comment",
-        "username": username,
-        "content": content,
-        // "image": image,
-        }
-        console.log(JSON.stringify(formData));
-        // 서버로 데이터를 전송하는 fetch 요청
-        fetch("/Comment", {
-          method: "POST",    
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(formData)
-        })
-        .then(function(response) {
-          if (response.ok) {
-            // 서버로부터 응답을 받은 후, 댓글 목록을 업데이트하는 함수 호출
-            updateComments();
-          }
-        })
-        .catch(function(error) {
-          console.log(error);
-        });
-  
-        // 댓글 작성 폼 초기화
-        document.getElementById("comment-username").value = "";
-        document.getElementById("comment-content").value = "";
-        // document.getElementById("comment-image").value = null;
-      });
-  
-      // 댓글 목록을 업데이트하는 함수
-      function updateComments() {
-        fetch("/comments")
-          .then(function(response) {
-            if (response.ok || response.status === 422 || response.status === 403 || response.status === 400) {
-              return response.json();
-            }
-          })
-          .then(responseHTML => {
-            var newPage = document.open("text/html", "replace");
-            newPage.write(responseHTML);
-            newPage.close();
-            resolve(responseHTML);
-          })
-          // .then(function(comments) {
-          //   var commentsContainer = document.querySelector(".comments");
-          //   console.log(commentsContainer);
-          //   commentsContainer.innerHTML = "";
-  
-          //   comments.forEach(function(comment) {
-          //     var commentElement = document.createElement("div");
-          //     commentElement.classList.add("comment");
-  
-          //     var usernameElement = document.createElement("span");
-          //     usernameElement.classList.add("comment-username");
-          //     usernameElement.textContent = comment.username;
-  
-          //     var contentElement = document.createElement("div");
-          //     contentElement.classList.add("comment-content");
-          //     contentElement.textContent = comment.content;
-  
-          //     commentElement.appendChild(usernameElement);
-          //     commentElement.appendChild(contentElement);
-          //     commentsContainer.appendChild(commentElement);
-          //   });
-          // })
-          .catch(function(error) {
-            console.log(error);
-          });
-      }
-  
-      // 페이지 로드 시 댓글 목록을 업데이트하는 함수 호출
-      updateComments();
+function addCommentsToContainer(comments) {
+  const container = document.querySelector('.container3');
+  const commentsContainer = container.querySelector('.comments');
+
+  // 기존 댓글을 삭제
+  commentsContainer.innerHTML = '';
+
+  // 업로드된 순서대로 번호를 추가
+  const commentsWithNumber = comments.map((comment, CommentIndex) => ({
+    ...comment,
+    number: CommentIndex + 1
+  }));
+
+  // 번호 순으로 정렬
+  const sortedComments = commentsWithNumber.sort((a, b) => a.number - b.number);
+
+  // 각 댓글에 대해 HTML 형식으로 변환하여 추가
+  sortedComments.forEach(comment => {
+    const { CommentIndex, UserName, CommentContent } = comment;
+
+    const commentElement = document.createElement('div');
+    commentElement.className = 'comment bg-gray-100 p-4 mb-4 rounded-lg';
+
+    const profileElement = document.createElement('div');
+    profileElement.className = 'comment-profile flex items-center';
+
+    const profilePictureElement = document.createElement('img');
+    profilePictureElement.src = '/img/profile_picture.png';
+    profilePictureElement.alt = '프로필 사진';
+    profilePictureElement.className = 'w-8 h-8 rounded-full mr-2';
+
+    const usernameElement = document.createElement('span');
+    usernameElement.className = 'comment-username text-gray-700 font-semibold';
+    usernameElement.textContent = UserName;
+
+    profileElement.appendChild(profilePictureElement);
+    profileElement.appendChild(usernameElement);
+
+    const contentElement = document.createElement('div');
+    contentElement.className = 'comment-content';
+    contentElement.textContent = CommentContent;
+
+    commentElement.appendChild(profileElement);
+    commentElement.appendChild(contentElement);
+
+    commentsContainer.appendChild(commentElement);
+  });
+}
+
+// 댓글 추가 함수 호출
+addCommentsToContainer([]);
+
+// comment-form의 submit 이벤트 핸들러
+document.getElementById('comment-form').addEventListener('submit', function (event) {
+  event.preventDefault();
+
+  var content = document.getElementById('comment-content').value;
+
+  // 서버로 전송할 JSON 데이터 생성
+  var page = window.location.pathname.split("/").pop()
+
+  const data = {
+    Form: 'Comment',
+    postid: page.split(".")[0],
+    content: content
+  };
+
+  console.log(data)
+
+  // 서버에 JSON 데이터 전송
+  fetch('/Comment', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(data)
+  })
+    .then(response => response.json())
+    .then(comments => {
+      // 댓글 리스트를 업데이트
+      addCommentsToContainer(comments);
+    })
+    .catch(error => {
+      console.error('Error:', error);
+    });
+});
