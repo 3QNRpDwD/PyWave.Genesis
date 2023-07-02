@@ -7,6 +7,7 @@ import secrets
 from urllib import parse
 import pickle
 import base64
+from hashlib import sha256
 import json
 import uuid
 import re
@@ -69,18 +70,18 @@ class Handler:
                     temporaryResponse = self.HandleTextFileRequest(f'/html{result}.html')
                 elif result == '/Account_Info':
                     temporaryResponse = self.HandleAccountFileRequest(Request)
-            
-            Response = PrepareHeader()._response_headers(*temporaryResponse) + temporaryResponse[1]
 
-            if is_valid_cookie:
-                expires=self.updateSessionExpiration(session,1,'p')
-                cookie = {'SessionID': f'{sessionid}; Expires={expires}; Path=/'}
-                Response = PrepareHeader()._response_headers(*temporaryResponse, Cookie=cookie) + temporaryResponse[1]
-
-            return Response
         except FileNotFoundError:
             temporaryResponse == self.ErrorHandler('404 Not Found', f'The corresponding {result} file could not be found.')
-            return PrepareHeader()._response_headers(*temporaryResponse) + temporaryResponse[1]
+
+        Response = PrepareHeader()._response_headers(*temporaryResponse) + temporaryResponse[1]
+
+        if is_valid_cookie:
+            expires=self.updateSessionExpiration(session,1,'p')
+            cookie = {'SessionID': f'{sessionid}; Expires={expires}; Path=/'}
+            Response = PrepareHeader()._response_headers(*temporaryResponse, Cookie=cookie) + temporaryResponse[1]
+
+        return Response
 
     def HandleRequestCustom(self,route='/'):
         def actual_decorator(original_function):
@@ -115,7 +116,7 @@ class Handler:
         elif Form == 'PostUpload':
             temporaryResponse = self.UploadPost_Handler(PostData=DictPostData, Session=session)
         elif Form =="Comment":
-            temporaryResponse = self.CommentPost_Handler(DictPostData, Session=session)
+            temporaryResponse = self.Handle_Comment_Post(DictPostData, Session=session)
             if temporaryResponse[0] == '200 OK':
                 return PrepareHeader()._response_headers(*temporaryResponse) + temporaryResponse[1]
 
@@ -234,7 +235,6 @@ class Handler:
         self.log(f"[ Session Destructed ] ==> SessionID : \033[96m{session.SessionToken}\033[0m")
         return self.HandleLogoutRequest(session)
 
-
     def HandleAccountFileRequest(self,Request):
         DataBase=self.getDatabase(self.verifySessionCookie(Request)[2].UserInfo['DataBaseID'])
         with open(f'resource/html/Account_Info.html','r',encoding='UTF-8') as TextFile:
@@ -265,31 +265,46 @@ class Handler:
             return self.ErrorHandler('403 Forbidden', 'Warning! You are attempting to post without logging in. If you wish to make a post, please proceed with the login.')
 
         PostImageName = ''
-        User = Session.UserInfo['UserUID']
+        User = str(Session.UserInfo['UserUID'])
         UploadTime = datetime.now().strftime('%Y-%m-%d_%H%M%S.%f')
-        post_file_upload_path = f'resource/PostFileUpload/{User}'
+        PostID=sha256((secrets.token_hex(32)+UploadTime).encode()).hexdigest()
+        post_file_upload_path = f'/PostFileUpload/{User}/'
 
         try:
-            os.makedirs(post_file_upload_path, exist_ok=True)
+            os.makedirs('resource'+post_file_upload_path, exist_ok=True)
         except OSError as e:
             print(f"Error: {e}")
 
-        PostFileName = f'resource/PostFileUpload/{User}/_{UploadTime}.html'.replace(':', '-')
+        PostFileName = f'{PostID}.html'
         title = PostData['title']
         content = PostData['content']
         name = Session.UserInfo['UserName']
-        image =f'_{UploadTime}.png'
+        image =f'{PostID}.png'
 
         if PostData['image'] is not None:
             OriginalData = base64.b64decode(PostData['image'])
-            PostImageName = f'_{UploadTime}.png'
-            with open(f'{post_file_upload_path}/{PostImageName}', 'wb') as ImageFile:
+            with open('resource'+post_file_upload_path+image, 'wb') as ImageFile:
                 ImageFile.write(OriginalData)
 
         with open(f'resource/html/Post_Form.html', 'r', encoding='UTF-8') as PostFormFile:
-            with open(PostFileName, 'w', encoding='UTF-8') as PostTempFile:
+            with open('resource'+post_file_upload_path+PostFileName, 'w', encoding='UTF-8') as PostTempFile:
                 PostTempFile.write(PostFormFile.read().format(PostTitle=title, PostContent=content, UserName=name, PostImage=image))
-                self.ServerPostDB.append({str(User): {'Path': f'/_{UploadTime}.html', 'title': title, 'content': content, 'name': name}})
+
+                self.ServerPostDB.append({
+                    'PostID': PostID,
+                    'Path': post_file_upload_path+PostFileName,
+                    'title': title,
+                    'content': content,
+                    'name': name,
+                    'UserID' : User
+                    })
+                
+                try:
+                    Session.UserInfo['PostID'].append(PostID)
+                except KeyError:
+                    Session.UserInfo['PostID']=[PostID]
+
+                self.Sessions.add(Session)
 
         return self.UpdateFeedPage()
 
@@ -309,10 +324,9 @@ class Handler:
 
         FeedPost = ''
         if self.ServerPostDB:
-            for i in self.ServerPostDB:
-                for ID, Post in i.items():
-                    PostFilePath = f'/PostFileUpload/{ID}' + Post['Path'].replace(':', '-')
-                    FeedPost += FeedPostForm.format(PostFilePath, Post['title'], Post['content'])
+            for PostData in self.ServerPostDB:
+                PostFilePath = PostData['Path']
+                FeedPost += FeedPostForm.format(PostFilePath, PostData['title'], PostData['content'])
 
         with open(f'resource/html/PostStorage.html', 'w', encoding='UTF-8') as PostStorage:
             PostStorage.write(FeedPost)
@@ -321,15 +335,65 @@ class Handler:
 
         return '200 OK', FeedForm
     
-    def CommentPost_Handler(self,CommantData,Session):
+    
+    def Handle_Comment_Post(self,CommantData, Session):
         if Session is None:
             return self.ErrorHandler('403 Forbidden', 'Warning! You are attempting to post without logging in. If you wish to make a post, please proceed with the login.')
-        User = Session.UserInfo['UserUID']
-        self.ServerCommentDB.append({User : CommantData})
-        print(self.ServerCommentDB)
-        json_data = json.dumps(CommantData)
-        cookie={'SessionID':f'{Session.SessionToken}; Expires={HttpDateTime().timestamp_to_http_datetime((datetime.now() + timedelta(days=1)).timestamp())}; Path=/'}
-        return '200 OK', json_data.encode('utf-8'), cookie
+        
+        CommentDict=self.Build_Comment_Dict(CommantData, Session)
+        Comments = self.Generate_Comments(CommentDict)
+
+        if not Comments:
+            return self.ErrorHandler('403 Forbidden', 'Sorry, you do not have sufficient permissions to add comments to this file. Please contact the file owner or administrator for assistance.')
+        
+        expires = self.updateSessionExpiration(Session,1,'p')
+        cookie = {'SessionID': f'{Session.SessionToken}; Expires={expires}; Path=/'}
+        
+        return '200 OK', Comments.encode('utf-8'), cookie
+
+
+    def Generate_Comments(self, CommentDict):
+
+        if not CommentDict:
+            return False
+
+        for Post in self.ServerPostDB:
+            if Post['PostID'] == CommentDict['PostID']:   
+
+                try:
+                    Post['Comments'].append(CommentDict)
+                except KeyError:
+                    Post['Comments']=[CommentDict]
+
+
+                for Comment in Post['Comments']:
+                    Comment['CommentIndex']=Post['Comments'].index(CommentDict)
+
+                self.ServerPostDB[self.ServerPostDB.index(Post)] = Post
+                CommentsJSON = json.dumps(Post['Comments'], indent=2)
+
+                return CommentsJSON
+            
+        return None
+    
+
+    def Build_Comment_Dict(self, rawCommantData, Session):
+        PostID = rawCommantData['postid']
+        CommentContent = rawCommantData['content']
+
+        if PostID not in Session.UserInfo['PostID']:
+            return False
+
+        UserName = Session.UserInfo['UserName']
+        
+        CommentDict = {
+            "CommentIndex": None,
+            "PostID": PostID,
+            "UserName": UserName,
+            "CommentContent": CommentContent
+        }
+            
+        return CommentDict
 
     def RegisterUserSession(self,  SessionValidityDays: str, UserInfo: dict):
         SessionInfo = Session(SessionValidityDays, UserInfo)
