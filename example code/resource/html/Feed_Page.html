@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>게시판</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link href="/css/Feed_Page.css" rel="stylesheet" >
+</head>
+
+<body>
+  <header class="bg-gray-900 text-white py-4">
+    <div class="container1 mx-auto flex flex-col md:flex-row justify-between items-center">
+      <nav>
+        <ul class="flex space-x-4">
+          <li><a href="/Index" class="hover:text-gray-300">Home</a></li>
+          <li><a href="/Explore" class="hover:text-gray-300">Explore</a></li>
+          <li><a href="/Feed_Page" class="hover:text-gray-300">Notifications</a></li>
+          <li><a href="/Messages" class="hover:text-gray-300">Messages</a></li>
+        </ul>
+      </nav>
+      <div class="flex items-center space-x-4">
+        <!-- 로그인 상태 확인 -->
+        <script>
+          const isLoggedIn = document.cookie.includes("SessionID");
+        </script>
+        <!-- 계정 정보 메뉴 -->
+        <script>
+          if (isLoggedIn) {{
+            document.write('<a href="Account_Info" class="text-gray-300 hover:text-white">Account</a>');
+            document.write('<span class="text-gray-300">|</span>');
+            document.write('<a href="Logout_form" class="text-gray-300 hover:text-white">Logout</a>');
+          }} else {{
+            document.write('<a href="Login_form" class="text-gray-300 hover:text-white">Login</a>');
+            document.write('<span class="text-gray-300">|</span>');
+            document.write('<a href="Register_form" class="text-gray-300 hover:text-white">Register</a>');
+          }}
+        </script>
+      </div>
+    </div>
+  </header>
+
+    <main class="py-8">
+      <div class="container mx-auto px-4">
+        <div class="mainform"></div>
+          <div class="border rounded-lg p-4 mb-8">
+            <!-- 게시물 작성 폼 -->
+            <div class="border rounded-lg p-4 mb-4">
+              <!-- 게시물 작성 폼 -->
+              <form id="postForm">
+                <div class="mb-4">
+                  <label for="title" class="block text-gray-800 font-bold mb-2">제목</label>
+                  <input type="text" id="title" class="w-full px-3 py-2 border rounded focus:outline-none focus:shadow-outline">
+                </div>
+                <div class="mb-4">
+                  <label for="content" class="block text-gray-700 font-bold mb-2">내용</label>
+                  <textarea id="content" class="w-full px-3 py-2 border rounded focus:outline-none focus:shadow-outline"></textarea>
+                </div>
+                <div class="mb-4">
+                  <label for="image" class="block text-gray-700 font-bold mb-2">사진 업로드</label>
+                  <div class="flex items-center justify-between">
+                    <label for="file-upload" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded cursor-pointer">
+                      파일 선택
+                    </label>
+                    <span id="file-name" class="ml-2"></span>
+                    <button type="button" id="delete-image" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-bold rounded cursor-pointer ml-2">삭제</button>
+                  </div>
+                  <input type="file" id="file-upload" class="hidden" accept="image/png">
+                  <div id="image-preview" class="mt-4"></div>
+                </div>
+                
+                <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-12 rounded focus:outline-none focus:shadow-outline">작성하기</button>
+              </form>
+            </div>
+
+          <!-- 게시물 리스트 -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              <div class="mainform">
+                <div class="border rounded-lg p-4 cursor-pointer" onclick="goToPostPage('post1')">
+                  <div class="post">
+                    <h2 class="text-lg font-bold mb-2">게시물 1</h2>
+                    <p>게시물 1 내용...</p>
+                  </div>
+                </div>
+              </div>
+              <div class="mainform">
+                <div class="border rounded-lg p-4 cursor-pointer" onclick="goToPostPage('post2')">
+                  <div class="post">
+                    <h2 class="text-lg font-bold mb-2">게시물 2</h2>
+                    <p>게시물 2 내용...</p>
+                  </div>
+                </div>
+              </div>
+              <div class="mainform">
+                <div class="border rounded-lg p-4 cursor-pointer" onclick="goToPostPage('post3')">
+                  <div class="post">
+                    <h2 class="text-lg font-bold mb-2">게시물 3</h2>
+                    <p>게시물 3 내용...</p>
+                  </div>
+                </div>
+              </div>
+              <!-- 추가 게시물 -->
+              
+            <div class="mainform">
+                <div class="border rounded-lg p-4 cursor-pointer" onclick="goToPostPage('/PostFileUpload/e3e9a0ff-e6e4-5f7a-a52b-e0e063349f9f/_2023-06-19_1910.html')">
+                    <div class="post">
+                        <h2 class="text-lg font-bold mb-2">1</h2>
+                        <p>1</p>
+                    </div>
+                </div>
+            </div>
+            {FeedPost}
+            </div>
+          <script type="text/javascript" src="/js/Feed_Page.js"></script>
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+
+</html>
