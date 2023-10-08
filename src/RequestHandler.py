@@ -57,7 +57,7 @@ class Handler:
 
             if any(extension in result for extension in ['.png', '.html', '.css', '.js']):
                 #path=f"/{result.split('.')[1]}{result}"
-                temporaryResponse = self.HandleFileRequest(result)
+                temporaryResponse  = self.HandleFileRequest(result)
             elif result == '/favicon.ico':
                 temporaryResponse = self.HandleFileRequest(f'/icon{result}')
             elif result == '/Feed_Page':
@@ -262,13 +262,15 @@ class Handler:
 
     def UploadPost_Handler(self,PostData=None, Session=None):
         if Session is None:
-            return self.ErrorHandler('403 Forbidden', 'Warning! You are attempting to post without logging in. If you wish to make a post, please proceed with the login.')
 
+            return self.ErrorHandler('403 Forbidden', 'Warning! You are attempting to post without logging in. If you wish to make a post, please proceed with the login.')
+        
         PostImageName = ''
         User = str(Session.UserInfo['UserUID'])
         UploadTime = datetime.now().strftime('%Y-%m-%d_%H%M%S.%f')
         PostID=sha256((secrets.token_hex(32)+UploadTime).encode()).hexdigest()
         post_file_upload_path = f'/PostFileUpload/{User}/'
+
 
         try:
             os.makedirs('resource'+post_file_upload_path, exist_ok=True)
@@ -357,22 +359,30 @@ class Handler:
         if not CommentDict:
             return False
 
+        
+
         for Post in self.ServerPostDB:
-            if Post['PostID'] == CommentDict['PostID']:   
+            if (Post['PostID'] == CommentDict['PostID'] and CommentDict["CommentContent"] != ''):   
 
                 try:
                     Post['Comments'].append(CommentDict)
                 except KeyError:
                     Post['Comments']=[CommentDict]
-
-
+                
                 for Comment in Post['Comments']:
                     Comment['CommentIndex']=Post['Comments'].index(CommentDict)
 
                 self.ServerPostDB[self.ServerPostDB.index(Post)] = Post
                 CommentsJSON = json.dumps(Post['Comments'], indent=2)
 
-                return CommentsJSON
+            elif (Post['PostID'] == CommentDict['PostID'] and CommentDict["CommentContent"] == ''):
+
+                try:
+                    CommentsJSON = json.dumps(Post['Comments'], indent=2)
+                except KeyError:
+                    CommentsJSON = None
+            
+            return CommentsJSON
             
         return None
     
